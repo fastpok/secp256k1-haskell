@@ -322,7 +322,7 @@ secKey bs
         ret <- withForeignPtr fp $ \p -> do
             poke p (SecKey32 (toShort bs))
             ecSecKeyVerify ctx p
-        if isSuccess ret
+        if isSuccess' ret
             then return $ Just $ SecKey fp
             else return Nothing
     | otherwise = Nothing
@@ -335,7 +335,7 @@ normalizeSig (Sig fg) = withContext $ \ctx -> do
     fg' <- mallocForeignPtr
     ret <- withForeignPtr fg $ \pg -> withForeignPtr fg' $ \pg' ->
         ecdsaSignatureNormalize ctx pg' pg
-    return (Sig fg', isSuccess ret)
+    return (Sig fg', isSuccess' ret)
 
 -- | 32-Byte 'ByteString' as 'Tweak'.
 tweak :: ByteString -> Maybe Tweak
@@ -371,7 +371,7 @@ importPubKey :: ByteString -> Maybe PubKey
 importPubKey bs =  withContext $ \ctx -> useByteString bs $ \(b, l) -> do
     fp <- mallocForeignPtr
     ret <- withForeignPtr fp $ \p -> ecPubKeyParse ctx p b l
-    if isSuccess ret then return $ Just $ PubKey fp else return Nothing
+    if isSuccess' ret then return $ Just $ PubKey fp else return Nothing
 
 -- | Encode public key as DER. First argument 'True' for compressed output.
 exportPubKey :: Bool -> PubKey -> ByteString
@@ -379,7 +379,7 @@ exportPubKey compress (PubKey pub) = withContext $ \ctx ->
     withForeignPtr pub $ \p -> alloca $ \l -> allocaBytes z $ \o -> do
         poke l (fromIntegral z)
         ret <- ecPubKeySerialize ctx o l p c
-        unless (isSuccess ret) $ error "could not serialize public key"
+        unless (isSuccess' ret) $ error "could not serialize public key"
         n <- peek l
         packByteString (o, n)
   where
@@ -390,7 +390,7 @@ exportCompactSig :: Sig -> CompactSig
 exportCompactSig (Sig fg) = withContext $ \ctx ->
     withForeignPtr fg $ \pg -> alloca $ \pc -> do
         ret <- ecdsaSignatureSerializeCompact ctx pc pg
-        unless (isSuccess ret) $ error "Could not obtain compact signature"
+        unless (isSuccess' ret) $ error "Could not obtain compact signature"
         peek pc
 
 importCompactSig :: CompactSig -> Maybe Sig
@@ -398,7 +398,7 @@ importCompactSig c = withContext $ \ctx -> alloca $ \pc -> do
     poke pc c
     fg <- mallocForeignPtr
     ret <- withForeignPtr fg $ \pg -> ecdsaSignatureParseCompact ctx pg pc
-    if isSuccess ret then return $ Just $ Sig fg else return Nothing
+    if isSuccess' ret then return $ Just $ Sig fg else return Nothing
 
 -- | Import DER-encoded signature.
 importSig :: ByteString -> Maybe Sig
@@ -406,7 +406,7 @@ importSig bs = withContext $ \ctx ->
     useByteString bs $ \(b, l) -> do
         fg <- mallocForeignPtr
         ret <- withForeignPtr fg $ \g -> ecdsaSignatureParseDer ctx g b l
-        if isSuccess ret then return $ Just $ Sig fg else return Nothing
+        if isSuccess' ret then return $ Just $ Sig fg else return Nothing
 
 -- | Encode signature as strict DER.
 exportSig :: Sig -> ByteString
@@ -414,7 +414,7 @@ exportSig (Sig fg) = withContext $ \ctx ->
     withForeignPtr fg $ \g -> alloca $ \l -> allocaBytes 72 $ \o -> do
         poke l 72
         ret <- ecdsaSignatureSerializeDer ctx o l g
-        unless (isSuccess ret) $ error "could not serialize signature"
+        unless (isSuccess' ret) $ error "could not serialize signature"
         n <- peek l
         packByteString (o, n)
 
@@ -422,21 +422,21 @@ exportSig (Sig fg) = withContext $ \ctx ->
 verifySig :: PubKey -> Sig -> Msg -> Bool
 verifySig (PubKey fp) (Sig fg) (Msg fm) = withContext $ \ctx ->
     withForeignPtr fp $ \p -> withForeignPtr fg $ \g ->
-        withForeignPtr fm $ \m -> isSuccess <$> ecdsaVerify ctx g m p
+        withForeignPtr fm $ \m -> isSuccess' <$> ecdsaVerify ctx g m p
 
 signMsg :: SecKey -> Msg -> Sig
 signMsg (SecKey fk) (Msg fm) = withContext $ \ctx ->
     withForeignPtr fk $ \k -> withForeignPtr fm $ \m -> do
         fg <- mallocForeignPtr
         ret <- withForeignPtr fg $ \g -> ecdsaSign ctx g m k nullPtr nullPtr
-        unless (isSuccess ret) $ error "could not sign message"
+        unless (isSuccess' ret) $ error "could not sign message"
         return $ Sig fg
 
 derivePubKey :: SecKey -> PubKey
 derivePubKey (SecKey fk) = withContext $ \ctx -> withForeignPtr fk $ \k -> do
     fp <- mallocForeignPtr
     ret <- withForeignPtr fp $ \p -> ecPubKeyCreate ctx p k
-    unless (isSuccess ret) $ error "could not compute public key"
+    unless (isSuccess' ret) $ error "could not compute public key"
     return $ PubKey fp
 
 
@@ -449,7 +449,7 @@ tweakAddSecKey (SecKey fk) (Tweak ft) = withContext $ \ctx ->
             key <- peek k
             poke k' key
             ecSecKeyTweakAdd ctx k' t
-        if isSuccess ret then return $ Just $ SecKey fk' else return Nothing
+        if isSuccess' ret then return $ Just $ SecKey fk' else return Nothing
 
 -- | Multiply secret key by tweak.
 tweakMulSecKey :: SecKey -> Tweak -> Maybe SecKey
@@ -460,7 +460,7 @@ tweakMulSecKey (SecKey fk) (Tweak ft) = withContext $ \ctx ->
             key <- peek k
             poke k' key
             ecSecKeyTweakMul ctx k' t
-        if isSuccess ret then return $ Just $ SecKey fk' else return Nothing
+        if isSuccess' ret then return $ Just $ SecKey fk' else return Nothing
 
 -- | Add tweak to public key. Tweak is multiplied first by G to obtain a point.
 tweakAddPubKey :: PubKey -> Tweak -> Maybe PubKey
@@ -471,7 +471,7 @@ tweakAddPubKey (PubKey fp) (Tweak ft) = withContext $ \ctx ->
             pub <- peek p
             poke p' pub
             ecPubKeyTweakAdd ctx p' t
-        if isSuccess ret then return $ Just $ PubKey fp' else return Nothing
+        if isSuccess' ret then return $ Just $ PubKey fp' else return Nothing
 
 -- | Multiply public key by tweak. Tweak is multiplied first by G to obtain a
 -- point.
@@ -483,7 +483,7 @@ tweakMulPubKey (PubKey fp) (Tweak ft) = withContext $ \ctx ->
             pub <- peek p
             poke p' pub
             ecPubKeyTweakMul ctx p' t
-        if isSuccess ret then return $ Just $ PubKey fp' else return Nothing
+        if isSuccess' ret then return $ Just $ PubKey fp' else return Nothing
 
 -- | Add multiple public keys together.
 combinePubKeys :: [PubKey] -> Maybe PubKey
@@ -496,7 +496,7 @@ combinePubKeys pubs = withContext $ \ctx ->
                 fp <- mallocForeignPtr
                 ret <- withForeignPtr fp $ \p ->
                     ecPubKeyCombine ctx p a (fromIntegral $ length ps)
-                if isSuccess ret
+                if isSuccess' ret
                     then return $ Just $ PubKey fp
                     else return Nothing
   where
@@ -518,14 +518,14 @@ importCompactRecSig cr =
     fg <- mallocForeignPtr
     ret <- withForeignPtr fg $ \pg ->
         ecdsaRecoverableSignatureParseCompact ctx pg pc recid
-    if isSuccess ret then return $ Just $ RecSig fg else return Nothing
+    if isSuccess' ret then return $ Just $ RecSig fg else return Nothing
 
 -- | Serialize an ECDSA signature in compact format (64 bytes + recovery id).
 exportCompactRecSig :: RecSig -> CompactRecSig
 exportCompactRecSig (RecSig fg) = withContext $ \ctx ->
     withForeignPtr fg $ \pg -> alloca $ \pc -> alloca $ \pr -> do
         ret <- ecdsaRecoverableSignatureSerializeCompact ctx pc pr pg
-        unless (isSuccess ret) $ error "Could not obtain compact signature"
+        unless (isSuccess' ret) $ error "Could not obtain compact signature"
         CompactSig r s <- peek pc
         v <- fromIntegral <$> peek pr
         return $ CompactRecSig r s v
@@ -537,7 +537,7 @@ convertRecSig (RecSig frg) = withContext $ \ctx ->
         fg <- mallocForeignPtr
         ret <- withForeignPtr fg $ \pg ->
             ecdsaRecoverableSignatureConvert ctx pg prg
-        unless (isSuccess ret) $
+        unless (isSuccess' ret) $
             error "Could not convert a recoverable signature"
         return $ Sig fg
 
@@ -548,7 +548,7 @@ signRecMsg (SecKey fk) (Msg fm) = withContext $ \ctx ->
         fg <- mallocForeignPtr
         ret <- withForeignPtr fg $ \g ->
             ecdsaSignRecoverable ctx g m k nullPtr nullPtr
-        unless (isSuccess ret) $ error "could not sign message"
+        unless (isSuccess' ret) $ error "could not sign message"
         return $ RecSig fg
 
 -- | Recover an ECDSA public key from a signature.
@@ -557,7 +557,7 @@ recover (RecSig frg) (Msg fm) = withContext $ \ctx ->
     withForeignPtr frg $ \prg -> withForeignPtr fm $ \pm -> do
         fp <- mallocForeignPtr
         ret <- withForeignPtr fp $ \pp -> ecdsaRecover ctx pp prg pm
-        if isSuccess ret then return $ Just $ PubKey fp else return Nothing
+        if isSuccess' ret then return $ Just $ PubKey fp else return Nothing
 #endif
 
 #ifdef NEGATE
@@ -569,7 +569,7 @@ tweakNegate (Tweak fk) = withContext $ \ctx -> do
         poke n peeked
         ecTweakNegate ctx n
     return $
-        if isSuccess ret
+        if isSuccess' ret
             then Just (Tweak fnew)
             else Nothing
 #endif
@@ -581,7 +581,7 @@ ecdh (PubKey pk) (SecKey sk) = withContext $ \ctx ->
     withForeignPtr pk $ \pkPtr -> withForeignPtr sk $ \skPtr ->
         allocaBytes size $ \o -> do
             ret <- ecEcdh ctx o pkPtr skPtr nullPtr nullPtr
-            unless (isSuccess ret) $ error "ecdh failed"
+            unless (isSuccess' ret) $ error "ecdh failed"
             packByteString (o, size)
   where
     size :: Integral a => a
@@ -604,7 +604,7 @@ schnorrTweakAddPubKey (XOnlyPubKey fp) (Tweak ft) = withContext $ \ctx ->
             poke p' pub
             schnorrPubKeyTweakAdd ctx p' is_negated t
         peeked_is_negated <- peek is_negated
-        if isSuccess ret then return $ Just $ (XOnlyPubKey fp', peeked_is_negated) else return Nothing
+        if isSuccess' ret then return $ Just $ (XOnlyPubKey fp', peeked_is_negated) else return Nothing
 
 -- | Add tweak to secret key.
 schnorrTweakAddSecKey :: SecKey -> Tweak -> Maybe SecKey
@@ -615,7 +615,7 @@ schnorrTweakAddSecKey (SecKey fk) (Tweak ft) = withContext $ \ctx ->
             key <- peek k
             poke k' key
             schnorrSecKeyTweakAdd ctx k' t
-        if isSuccess ret then return $ Just $ SecKey fk' else return Nothing
+        if isSuccess' ret then return $ Just $ SecKey fk' else return Nothing
 
 signMsgSchnorr :: SecKey -> Msg -> SchnorrSig
 signMsgSchnorr (SecKey fk) (Msg fm) =
@@ -626,14 +626,14 @@ signMsgSchnorr (SecKey fk) (Msg fm) =
         ret <-
           withForeignPtr fg $ \g ->
             schnorrSign ctx g m k nullPtr nullPtr
-        unless (isSuccess ret) $ error "could not schnorr-sign message"
+        unless (isSuccess' ret) $ error "could not schnorr-sign message"
         return $ SchnorrSig fg
 
 exportSchnorrSig :: SchnorrSig -> ByteString
 exportSchnorrSig (SchnorrSig fg) = withContext $ \ctx ->
     withForeignPtr fg $ \g -> allocaBytes 64 $ \o -> do
         ret <- signatureSerializeSchnorr ctx o g
-        unless (isSuccess ret) $ error "could not serialize schnorr signature"
+        unless (isSuccess' ret) $ error "could not serialize schnorr signature"
         packByteString (o, 64)
 
 importXOnlyPubKey :: ByteString -> Maybe XOnlyPubKey
@@ -642,7 +642,7 @@ importXOnlyPubKey bs
         fp <- mallocForeignPtr
         ret <- withForeignPtr fp $ \pfp -> useByteString bs $ \(inp, _) ->
             schnorrXOnlyPubKeyParse ctx pfp inp
-        if isSuccess ret
+        if isSuccess' ret
             then return $ Just $ XOnlyPubKey fp
             else return Nothing
     | otherwise = Nothing
@@ -653,7 +653,7 @@ importSchnorrSig bs
         fp <- mallocForeignPtr
         ret <- withForeignPtr fp $ \pfp -> useByteString bs $ \(inp, _) ->
             schnorrSignatureParse ctx pfp inp
-        if isSuccess ret
+        if isSuccess' ret
             then return $ Just $ SchnorrSig fp
             else return Nothing
     | otherwise = Nothing
@@ -661,20 +661,20 @@ importSchnorrSig bs
 verifyMsgSchnorr :: XOnlyPubKey -> SchnorrSig -> Msg -> Bool
 verifyMsgSchnorr (XOnlyPubKey fp) (SchnorrSig fg) (Msg fm) = withContext $ \ctx ->
     withForeignPtr fp $ \p -> withForeignPtr fg $ \g ->
-        withForeignPtr fm $ \m -> isSuccess <$> schnorrSignatureVerify ctx g m p
+        withForeignPtr fm $ \m -> isSuccess' <$> schnorrSignatureVerify ctx g m p
 
 exportXOnlyPubKey :: XOnlyPubKey -> ByteString
 exportXOnlyPubKey (XOnlyPubKey pub) = withContext $ \ctx ->
     withForeignPtr pub $ \p -> allocaBytes 32 $ \o -> do
         ret <- schnorrPubKeySerialize ctx o p
-        unless (isSuccess ret) $ error "could not serialize x-only public key"
+        unless (isSuccess' ret) $ error "could not serialize x-only public key"
         packByteString (o, 32)
 
 deriveXOnlyPubKey :: SecKey -> XOnlyPubKey
 deriveXOnlyPubKey (SecKey fk) = withContext $ \ctx -> withForeignPtr fk $ \k -> do
     fp <- mallocForeignPtr
     ret <- withForeignPtr fp $ \p -> schnorrXOnlyPubKeyCreate ctx p k
-    unless (isSuccess ret) $ error "could not derive x-only public key"
+    unless (isSuccess' ret) $ error "could not derive x-only public key"
     return $ XOnlyPubKey fp
 
 testTweakXOnlyPubKey :: XOnlyPubKey -> CInt -> XOnlyPubKey -> Tweak -> Bool
@@ -684,7 +684,7 @@ testTweakXOnlyPubKey (XOnlyPubKey fp) is_negated (XOnlyPubKey internal) (Tweak f
     withForeignPtr internal $ \internalp ->
     withForeignPtr ft $ \t -> do
         ret <- xOnlyPubKeyTweakTest ctx p is_negated internalp t
-        return $ isSuccess ret
+        return $ isSuccess' ret
 -- End of Schnorr block
 #endif
 

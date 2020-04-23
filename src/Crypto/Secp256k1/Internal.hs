@@ -258,10 +258,10 @@ instance Storable Algo16 where
     poke p (Algo16 k) = useByteString (fromShort k) $
         \(b, _) -> copyArray (castPtr p) b 16
 
-isSuccess :: Ret -> Bool
-isSuccess (Ret 0) = False
-isSuccess (Ret 1) = True
-isSuccess _       = undefined
+isSuccess' :: Ret -> Bool
+isSuccess' (Ret 0) = False
+isSuccess' (Ret 1) = True
+isSuccess' _       = undefined
 
 {-# NOINLINE fctx #-}
 fctx :: ForeignPtr Ctx
@@ -269,7 +269,7 @@ fctx = unsafePerformIO $ do
     x <- contextCreate signVerify
     e <- getEntropy 32
     ret <- alloca $ \s -> poke s (Seed32 (toShort e)) >> contextRandomize x s
-    unless (isSuccess ret) $ error "failed to randomize context"
+    unless (isSuccess' ret) $ error "failed to randomize context"
     newForeignPtr contextDestroy x
 
 {-# INLINE withContext #-}
